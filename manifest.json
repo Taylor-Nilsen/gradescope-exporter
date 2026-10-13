@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Gradescope Exporter",
+  "version": "1.0",
+  "description": "Zip up your Gradescope submissions (original and/or graded copy) for one assignment or a whole course.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://www.gradescope.com/*", "https://*.amazonaws.com/*"],
+  "action": { "default_title": "Export Gradescope submissions" },
+  "background": { "service_worker": "background.js" }
+}
