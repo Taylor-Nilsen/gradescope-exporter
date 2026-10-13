@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Gradescope Exporter</title>
+<style>
+  body{font:15px system-ui;max-width:640px;margin:40px auto;padding:0 16px}
+  fieldset{border:1px solid #ccc;margin:12px 0;padding:10px 14px}
+  label{display:block;margin:6px 0}
+  button{font:inherit;padding:8px 18px}
+  pre{background:#f4f4f4;padding:10px;max-height:50vh;overflow:auto;white-space:pre-wrap}
+</style>
+<h2>Gradescope Exporter</h2>
+<p id="ctx">Reading page…</p>
+<fieldset><legend>Scope</legend>
+  <label><input type="radio" name="scope" value="assignment" id="scopeA"> This assignment only</label>
+  <label><input type="radio" name="scope" value="course" checked> Whole course</label>
+</fieldset>
+<fieldset><legend>Files</legend>
+  <label><input type="checkbox" id="orig" checked> Original (what you submitted)</label>
+  <label><input type="checkbox" id="graded" checked> Graded copy (with annotations, only where graded)</label>
+</fieldset>
+<button id="go">Export to ZIP</button>
+<pre id="log"></pre>
+<script src="export.js"></script>
