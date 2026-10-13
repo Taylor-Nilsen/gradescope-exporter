@@ -38,23 +38,25 @@ async function run(courseId, submissionId) {
   if (!subs.length) throw new Error('No submissions found (are you logged in?)');
   log(`${courseName}: ${subs.length} submission(s)`);
 
-  // 2. fetch files
+  // 2. fetch files (all submissions in parallel)
   const files = [];
-  for (const s of subs) {
+  await Promise.all(subs.map(async s => {
     const folder = safe(s.name);
     const j = await (await fetch(`${GS}${s.path}.json?content=react`, { credentials: 'include', headers: { Accept: 'application/json' } })).json();
-    if (wantOrig && j.paths.original_file_path) {
+    const orig = wantOrig && j.paths.original_file_path && fetch(j.paths.original_file_path);
+    const graded = wantGraded && j.paths.graded_pdf_path && gradedPdf(j.paths);
+    if (orig) {
       const name = j.pdf_attachment?.filename || 'original';
-      const r = await fetch(j.paths.original_file_path);
+      const r = await orig;
       if (r.ok) { files.push([`${folder}/${name}`, new Uint8Array(await r.arrayBuffer())]); log(`✓ ${folder}/${name}`); }
       else log(`✗ ${folder}: original ${r.status}`);
     }
-    if (wantGraded && j.paths.graded_pdf_path) {
-      const buf = await gradedPdf(j.paths);
+    if (graded) {
+      const buf = await graded;
       if (buf) { files.push([`${folder}/${folder}-graded.pdf`, buf]); log(`✓ ${folder}/${folder}-graded.pdf`); }
       else log(`– ${folder}: no graded copy`);
     }
-  }
+  }));
   if (!files.length) throw new Error('Nothing downloaded');
 
   // 3. zip + download
