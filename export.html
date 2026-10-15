@@ -21,14 +21,18 @@
   button:disabled { opacity:.5; cursor:default }
   pre { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px 14px; margin-top:20px; font:13px/1.6 ui-monospace, Menlo, monospace; white-space:pre-wrap; max-height:50vh; overflow:auto; color:var(--muted) }
   pre:empty { display:none }
+  .course { display:grid; grid-template-columns:1fr auto; align-items:center; border-top:1px solid var(--line); padding:4px 0 }
+  .course:first-child { border-top:0 }
+  .course .term { color:var(--muted); font-size:13px; margin-left:4px }
+  .toggle { background:none; border:0; padding:4px 8px; margin:0; color:var(--muted); font-size:14px; cursor:pointer }
+  .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
+  .subs:empty { display:none }
+  .subs label { padding:3px 0 }
 </style>
 <main>
   <header><img src="icons/icon48.png" alt=""><h1>Gradescope Exporter</h1></header>
   <p id="ctx">Reading page…</p>
-  <section><h2>Scope</h2>
-    <label><input type="radio" name="scope" value="assignment" id="scopeA"> This assignment only</label>
-    <label><input type="radio" name="scope" value="course" checked> Whole course</label>
-  </section>
+  <section><h2>Courses</h2><div id="courses"></div></section>
   <section><h2>Files</h2>
     <label><input type="checkbox" id="orig" checked> Original (what you submitted)</label>
     <label><input type="checkbox" id="graded" checked> Graded copy (with annotations, where graded)</label>
