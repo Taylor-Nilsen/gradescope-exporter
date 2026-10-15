@@ -3,8 +3,27 @@
   "name": "Gradescope Exporter",
   "version": "1.0",
   "description": "Zip up your Gradescope submissions (original and/or graded copy) for one assignment or a whole course.",
-  "permissions": ["activeTab"],
-  "host_permissions": ["https://www.gradescope.com/*", "https://*.amazonaws.com/*"],
-  "action": { "default_title": "Export Gradescope submissions" },
-  "background": { "service_worker": "background.js" }
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.gradescope.com/*",
+    "https://*.amazonaws.com/*"
+  ],
+  "action": {
+    "default_title": "Export Gradescope submissions",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
