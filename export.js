@@ -30,6 +30,9 @@ async function run(courseId, submissionId) {
   const html = await (await fetch(`${GS}/courses/${courseId}`, { credentials: 'include' })).text();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const courseName = (doc.querySelector('.courseHeader--title')?.textContent || `course-${courseId}`).trim();
+  const term = (doc.querySelector('.courseHeader--term')?.textContent || '').replace(/\s+/g, '');
+  const prof = lastName(doc.querySelector('li[id^=sidebar-instructor-] .sidebar--menuItemLabel')?.textContent || '');
+  const prefix = [courseName, term, prof].filter(Boolean).map(safe).join('_');
   subs = [...doc.querySelectorAll('#assignments-student-table tbody tr')].map(tr => {
     const a = tr.querySelector('th a');
     return a && { name: tr.querySelector('th').textContent.trim(), path: a.getAttribute('href') };
@@ -48,12 +51,12 @@ async function run(courseId, submissionId) {
     if (orig) {
       const name = j.pdf_attachment?.filename || 'original';
       const r = await orig;
-      if (r.ok) { files.push([`${folder}/${name}`, new Uint8Array(await r.arrayBuffer())]); log(`✓ ${folder}/${name}`); }
+      if (r.ok) { files.push([`${prefix}_${folder}_${name}`, new Uint8Array(await r.arrayBuffer())]); log(`✓ ${prefix}_${folder}_${name}`); }
       else log(`✗ ${folder}: original ${r.status}`);
     }
     if (graded) {
       const buf = await graded;
-      if (buf) { files.push([`${folder}/${folder}-graded.pdf`, buf]); log(`✓ ${folder}/${folder}-graded.pdf`); }
+      if (buf) { files.push([`${prefix}_${folder}_graded.pdf`, buf]); log(`✓ ${prefix}_${folder}_graded.pdf`); }
       else log(`– ${folder}: no graded copy`);
     }
   }));
@@ -79,6 +82,8 @@ async function gradedPdf(paths) {
 }
 
 const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
+// "Last, First" or "First Last" -> Last
+const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
 
 // Minimal STORE-only zip writer (PDFs don't compress anyway).
 const crcTable = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xEDB88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });

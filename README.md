@@ -10,6 +10,6 @@ Brave/Chrome extension that zips up your Gradescope submissions. Export one assi
 1. Open a Gradescope course page (or one of your submission pages)
 2. Click the extension icon
 3. Pick scope (this assignment / whole course) and files (original / graded copy)
-4. **Export to ZIP** → `<course name>.zip`, one folder per assignment
+4. **Export to ZIP** → `<course name>.zip`, files named `course_term_prof_assignment_filename`
 
 Graded copies only exist for graded assignments; ungraded ones are skipped with a note in the log.
