@@ -97,22 +97,21 @@ async function run() {
 
   const files = [];
   await Promise.all(jobs.map(async ({ c, s }) => {
-    const dir = safe(c.name), prefix = [c.name, c.term.replace(/\s+/g, ''), c.prof].filter(Boolean).map(safe).join('_');
-    const folder = safe(s.name);
+    const dir = safe(c.name), base = fileBase(c, s.name);
     const j = await (await get(s.path + '.json?content=react', { headers: { Accept: 'application/json' } })).json();
     const orig = wantOrig && j.paths.original_file_path && fetch(j.paths.original_file_path);
     const graded = wantGraded && j.paths.graded_pdf_path && gradedPdf(j.paths);
     if (orig) {
-      const name = `${dir}/${prefix}_${folder}_${j.pdf_attachment?.filename || 'original'}`;
+      const name = `${dir}/${base}${(j.pdf_attachment?.filename || '').match(/\.[^.]+$/)?.[0] || ''}`;
       const r = await orig;
       if (r.ok) { files.push([name, new Uint8Array(await r.arrayBuffer())]); log('✓ ' + name); }
       else log(`✗ ${name}: ${r.status}`);
     }
     if (graded) {
-      const name = `${dir}/${prefix}_${folder}_graded.pdf`;
+      const name = `${dir}/${base}_graded.pdf`;
       const buf = await graded;
       if (buf) { files.push([name, buf]); log('✓ ' + name); }
-      else log(`– ${folder}: no graded copy`);
+      else log(`– ${s.name}: no graded copy`);
     }
   }));
   if (!files.length) throw new Error('Nothing downloaded');
@@ -135,6 +134,11 @@ async function gradedPdf(paths) {
   return null;
 }
 
+// "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mt_mosleh_f16
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
+const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
+const fileBase = (c, assignment) => [slug(c.name), abbr(assignment), slug(c.prof || ''), termCode(c.term)].filter(Boolean).join('_');
 const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
 // "Last, First" or "First Last" -> Last
 const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
