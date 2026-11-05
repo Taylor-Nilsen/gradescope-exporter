@@ -3,7 +3,10 @@
 <title>Gradescope Exporter</title>
 <link rel="icon" href="icons/icon48.png">
 <style>
-  :root { --bg:#f7f6f2; --panel:#fdfcfa; --blue:#bfdcf2; --blue-dark:#8fc0e4; --ink:#2b2f33; --muted:#6b7177; --line:#e2dfd8; }
+  :root { color-scheme:light dark; --bg:#f7f6f2; --panel:#fdfcfa; --field:#fff; --blue:#bfdcf2; --blue-dark:#8fc0e4; --ink:#2b2f33; --muted:#6b7177; --line:#e2dfd8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1b1d20; --panel:#232629; --field:#1b1d20; --blue:#2f5877; --blue-dark:#4a83b0; --ink:#e4e6e8; --muted:#9ba2a9; --line:#363a3f; }
+  }
   * { box-sizing:border-box }
   body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif }
   main { max-width:560px; margin:56px auto; padding:0 20px }
@@ -38,7 +41,7 @@
   .course .term, .course .prof { color:var(--muted); font-size:13px }
   .course .prof:empty::before { content:'add prof'; opacity:.6 }
   .editable { cursor:text }
-  .edit { font:inherit; font-size:13px; color:var(--ink); padding:1px 6px; border:1px solid var(--blue-dark); border-radius:4px; background:#fff; outline:none }
+  .edit { font:inherit; font-size:13px; color:var(--ink); padding:1px 6px; border:1px solid var(--blue-dark); border-radius:4px; background:var(--field); outline:none }
   .toggle { background:none; border:0; padding:4px 8px; margin:0; color:var(--muted); font-size:14px; cursor:pointer }
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
