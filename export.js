@@ -7,6 +7,10 @@ const log = s => { $('log').textContent += s + '\n'; };
 const get = (path, opts = {}) => fetch(GS + path, { credentials: 'include', ...opts });
 const parse = html => new DOMParser().parseFromString(html, 'text/html');
 
+// Term overrides the user typed in, kept per course id across sessions.
+const overrides = (() => { try { return JSON.parse(localStorage.termOverrides || '{}'); } catch { return {}; } })();
+const termOf = c => overrides[c.id] || c.term;
+
 // courses: id -> { id, name, term, subs: null | [{name, path}], picked: Set(path), all: bool }
 const courses = new Map();
 
@@ -53,7 +57,9 @@ function render() {
     row.innerHTML = `<label><input type="checkbox"> <span class="name"></span> <span class="term"></span></label>
       <button class="toggle" aria-label="Show assignments">${c.open ? '▾' : '▸'}</button><div class="subs"></div>`;
     row.querySelector('.name').textContent = c.name;
-    row.querySelector('.term').textContent = c.term;
+    const term = row.querySelector('.term');
+    term.textContent = termOf(c);
+    term.onclick = e => { e.preventDefault(); editTerm(c, term); };
     const cb = row.querySelector('input');
     cb.checked = st === 'all'; cb.indeterminate = st === 'some';
     cb.onchange = async () => {
@@ -76,6 +82,13 @@ function render() {
     }
     root.appendChild(row);
   }
+  const sts = [...courses.values()].map(state);
+  $('all').checked = sts.every(x => x === 'all');
+  $('all').indeterminate = !$('all').checked && sts.some(x => x !== 'none');
+  const years = new Set([...courses.values()].map(c => termOf(c).match(/\d{4}/)?.[0]).filter(Boolean));
+  const known = new Set([...courses.values()].map(termOf).filter(Boolean));
+  for (const y of years) for (const q of ['Winter', 'Spring', 'Summer', 'Fall']) known.add(`${q} ${y}`);
+  $('terms').replaceChildren(...[...known].map(t => Object.assign(document.createElement('option'), { value: t })));
   const n = [...courses.values()].reduce((t, c) => t + (c.all ? (c.subs?.length ?? 1) : c.picked.size), 0);
   $('go').disabled = n === 0;
   $('go').textContent = n ? `Export ${[...courses.values()].filter(c => state(c) !== 'none').length} course(s) to ZIP` : 'Select something to export';
@@ -86,6 +99,29 @@ const progress = (done, total, text) => {
   if (total) { $('bar').max = total; $('bar').value = done; } else $('bar').removeAttribute('value');
   $('pct').textContent = text ?? `${done} / ${total}`;
 };
+
+$('all').onchange = () => {
+  const on = $('all').checked;
+  for (const c of courses.values()) { if (c.subs) c.picked = new Set(on ? c.subs.map(s => s.path) : []); else c.all = on; }
+  render();
+};
+
+// Swap the term label for a text box; Enter/blur saves, Esc cancels, empty resets to Gradescope's term.
+function editTerm(c, span) {
+  const inp = Object.assign(document.createElement('input'), { className: 'term-edit', value: termOf(c) });
+  inp.setAttribute('list', 'terms');
+  inp.onblur = () => {
+    const v = inp.value.trim();
+    if (v && v !== c.term) overrides[c.id] = v; else delete overrides[c.id];
+    try { localStorage.termOverrides = JSON.stringify(overrides); } catch {}
+    render();
+  };
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.onblur = null; render(); }
+  };
+  span.replaceWith(inp); inp.focus(); inp.select();
+}
 
 $('go').onclick = async () => {
   $('log').textContent = ''; busy(true); progress(0, 0, 'Loading…');
@@ -147,7 +183,7 @@ async function gradedPdf(paths) {
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
-const fileBase = (c, assignment) => [slug(c.name), slug(c.prof || ''), termCode(c.term), abbr(assignment || '')].filter(Boolean).join('_');
+const fileBase = (c, assignment) => [slug(c.name), slug(c.prof || ''), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
 const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
 // "Last, First" or "First Last" -> Last
 const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();

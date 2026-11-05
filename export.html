@@ -13,6 +13,8 @@
   #ctx { color:var(--muted); margin:0 0 28px; font-size:14px }
   section { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px 18px; margin-bottom:14px }
   section h2 { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px }
+  h2.head { display:flex; justify-content:space-between; align-items:center }
+  h2.head label { padding:0; gap:8px }
   label { display:flex; align-items:center; gap:10px; padding:5px 0; cursor:pointer }
   label:has(input:disabled) { color:var(--muted); cursor:default }
   input[type=radio], input[type=checkbox] { width:16px; height:16px; margin:0; accent-color:var(--blue-dark) }
@@ -33,7 +35,8 @@
   pre:empty { display:none }
   .course { display:grid; grid-template-columns:1fr auto; align-items:center; border-top:1px solid var(--line); padding:4px 0 }
   .course:first-child { border-top:0 }
-  .course .term { color:var(--muted); font-size:13px; margin-left:4px }
+  .course .term { color:var(--muted); font-size:13px; margin-left:4px; cursor:text }
+  .term-edit { font:inherit; font-size:13px; color:var(--ink); margin-left:4px; padding:1px 6px; width:12em; border:1px solid var(--blue-dark); border-radius:4px; background:#fff; outline:none }
   .toggle { background:none; border:0; padding:4px 8px; margin:0; color:var(--muted); font-size:14px; cursor:pointer }
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
@@ -42,12 +45,13 @@
 <main>
   <header><img src="icons/icon48.png" alt=""><h1>Gradescope Exporter</h1></header>
   <p id="ctx">Reading page…</p>
-  <section><h2>Courses</h2><div id="courses"></div></section>
+  <section><h2 class="head">Courses <label><input type="checkbox" id="all"> Select all</label></h2><div id="courses"></div></section>
   <section><h2>Files</h2>
     <label><input type="checkbox" id="orig" checked> Original (what you submitted)</label>
     <label><input type="checkbox" id="graded" checked> Graded copy (with annotations, where graded)</label>
   </section>
   <div class="actions"><button id="go">Export to ZIP</button><progress id="bar" hidden></progress><span id="pct" hidden></span></div>
   <pre id="log"></pre>
+  <datalist id="terms"></datalist>
 </main>
 <script src="export.js"></script>
