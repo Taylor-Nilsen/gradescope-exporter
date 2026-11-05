@@ -19,6 +19,16 @@
   button { font:inherit; font-weight:600; color:var(--ink); background:var(--blue); border:1px solid var(--blue-dark); border-radius:6px; padding:10px 22px; cursor:pointer; margin-top:6px }
   button:hover:not(:disabled) { background:var(--blue-dark) }
   button:disabled { opacity:.5; cursor:default }
+  .actions { display:flex; align-items:center; gap:12px; margin-top:6px; min-height:44px }
+  .actions button { margin:0 }
+  progress { flex:1; height:10px; appearance:none; border:1px solid var(--blue-dark); border-radius:6px; background:var(--panel); overflow:hidden }
+  progress::-webkit-progress-bar { background:var(--panel) }
+  progress::-webkit-progress-value { background:var(--blue-dark); transition:width .2s }
+  progress:indeterminate { background:linear-gradient(90deg, var(--panel) 0 30%, var(--blue) 50%, var(--panel) 70%) 0 0 / 300% 100%; animation:slide 1.2s linear infinite }
+  progress:indeterminate::-webkit-progress-bar { background:transparent }
+  @keyframes slide { to { background-position:-150% 0 } }
+  #pct { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap }
+  [hidden] { display:none !important }
   pre { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px 14px; margin-top:20px; font:13px/1.6 ui-monospace, Menlo, monospace; white-space:pre-wrap; max-height:50vh; overflow:auto; color:var(--muted) }
   pre:empty { display:none }
   .course { display:grid; grid-template-columns:1fr auto; align-items:center; border-top:1px solid var(--line); padding:4px 0 }
@@ -37,7 +47,7 @@
     <label><input type="checkbox" id="orig" checked> Original (what you submitted)</label>
     <label><input type="checkbox" id="graded" checked> Graded copy (with annotations, where graded)</label>
   </section>
-  <button id="go">Export to ZIP</button>
+  <div class="actions"><button id="go">Export to ZIP</button><progress id="bar" hidden></progress><span id="pct" hidden></span></div>
   <pre id="log"></pre>
 </main>
 <script src="export.js"></script>

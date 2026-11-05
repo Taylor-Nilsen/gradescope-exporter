@@ -81,10 +81,16 @@ function render() {
   $('go').textContent = n ? `Export ${[...courses.values()].filter(c => state(c) !== 'none').length} course(s) to ZIP` : 'Select something to export';
 }
 
+const busy = on => { $('go').hidden = on; $('bar').hidden = $('pct').hidden = !on; };
+const progress = (done, total, text) => {
+  if (total) { $('bar').max = total; $('bar').value = done; } else $('bar').removeAttribute('value');
+  $('pct').textContent = text ?? `${done} / ${total}`;
+};
+
 $('go').onclick = async () => {
-  $('go').disabled = true; $('log').textContent = '';
+  $('log').textContent = ''; busy(true); progress(0, 0, 'Loading…');
   try { await run(); } catch (e) { log('ERROR: ' + e.message); }
-  render();
+  busy(false); render();
 };
 
 async function run() {
@@ -96,7 +102,9 @@ async function run() {
   log(`${jobs.length} submission(s) across ${picked.length} course(s)`);
 
   const files = [];
-  await Promise.all(jobs.map(async ({ c, s }) => {
+  let done = 0;
+  progress(0, jobs.length);
+  await Promise.all(jobs.map(async ({ c, s }) => { try {
     const dir = safe(c.name), base = fileBase(c, s.name);
     const j = await (await get(s.path + '.json?content=react', { headers: { Accept: 'application/json' } })).json();
     const orig = wantOrig && j.paths.original_file_path && fetch(j.paths.original_file_path);
@@ -113,9 +121,10 @@ async function run() {
       if (buf) { files.push([name, buf]); log('✓ ' + name); }
       else log(`– ${s.name}: no graded copy`);
     }
-  }));
+  } finally { progress(++done, jobs.length); } }));
   if (!files.length) throw new Error('Nothing downloaded');
 
+  progress(0, 0, 'Zipping…');
   const blob = new Blob([zip(files)], { type: 'application/zip' });
   const zipName = picked.length === 1 ? safe(picked[0].name) : 'gradescope-export';
   Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: zipName + '.zip' }).click();
