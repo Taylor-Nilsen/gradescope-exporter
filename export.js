@@ -132,7 +132,7 @@ $('go').onclick = async () => {
 async function run() {
   const wantOrig = $('orig').checked, wantGraded = $('graded').checked;
   const picked = [...courses.values()].filter(c => state(c) !== 'none');
-  await Promise.all(picked.map(load));
+  const [user] = await Promise.all([userName(), ...picked.map(load)]);
   const jobs = picked.flatMap(c => c.subs.filter(s => c.picked.has(s.path)).map(s => ({ c, s })));
   if (!jobs.length) throw new Error('Nothing selected');
   log(`${jobs.length} submission(s) across ${picked.length} course(s)`);
@@ -161,11 +161,23 @@ async function run() {
   if (!files.length) throw new Error('Nothing downloaded');
 
   progress(0, 0, 'Zipping…');
-  const blob = new Blob([zip(files)], { type: 'application/zip' });
-  const zipName = picked.length === 1 ? safe(picked[0].name) : 'gradescope-export';
-  Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: zipName + '.zip' }).click();
+  const top = ['gradescope_export', slug(user), stamp(new Date())].filter(Boolean).join('_');
+  const blob = new Blob([zip(files.map(([n, d]) => [`${top}/${n}`, d]))], { type: 'application/zip' });
+  Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: top + '.zip' }).click();
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
 }
+
+// Name from the account settings form; '' if it can't be read.
+async function userName() {
+  try {
+    const doc = parse(await (await get('/account/edit')).text());
+    const v = n => doc.querySelector(`[name="user[${n}]"]`)?.value?.trim() || '';
+    return v('name') || [v('first_name'), v('last_name')].filter(Boolean).join(' ');
+  } catch { return ''; }
+}
+
+// Local time -> 2026-11-05_1642
+const stamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; };
 
 // Graded PDF is generated on demand; poll status until complete.
 async function gradedPdf(paths) {
@@ -184,7 +196,6 @@ const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, 
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(c.name), slug(c.prof || ''), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
-const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
 // "Last, First" or "First Last" -> Last
 const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
 
