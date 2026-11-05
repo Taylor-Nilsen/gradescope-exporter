@@ -143,11 +143,11 @@ async function gradedPdf(paths) {
   return null;
 }
 
-// "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mt_mosleh_f16 (no assignment -> mae_174_mosleh_f16)
+// "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mosleh_f16_mt (no assignment -> mae_174_mosleh_f16)
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
-const fileBase = (c, assignment) => [slug(c.name), abbr(assignment || ''), slug(c.prof || ''), termCode(c.term)].filter(Boolean).join('_');
+const fileBase = (c, assignment) => [slug(c.name), slug(c.prof || ''), termCode(c.term), abbr(assignment || '')].filter(Boolean).join('_');
 const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
 // "Last, First" or "First Last" -> Last
 const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
