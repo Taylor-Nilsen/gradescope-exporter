@@ -35,8 +35,10 @@
   pre:empty { display:none }
   .course { display:grid; grid-template-columns:1fr auto; align-items:center; border-top:1px solid var(--line); padding:4px 0 }
   .course:first-child { border-top:0 }
-  .course .term { color:var(--muted); font-size:13px; margin-left:4px; cursor:text }
-  .term-edit { font:inherit; font-size:13px; color:var(--ink); margin-left:4px; padding:1px 6px; width:12em; border:1px solid var(--blue-dark); border-radius:4px; background:#fff; outline:none }
+  .course .term, .course .prof { color:var(--muted); font-size:13px }
+  .course .prof:empty::before { content:'add prof'; opacity:.6 }
+  .editable { cursor:text }
+  .edit { font:inherit; font-size:13px; color:var(--ink); padding:1px 6px; border:1px solid var(--blue-dark); border-radius:4px; background:#fff; outline:none }
   .toggle { background:none; border:0; padding:4px 8px; margin:0; color:var(--muted); font-size:14px; cursor:pointer }
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
@@ -53,5 +55,6 @@
   <div class="actions"><button id="go">Export to ZIP</button><progress id="bar" hidden></progress><span id="pct" hidden></span></div>
   <pre id="log"></pre>
   <datalist id="terms"></datalist>
+  <datalist id="profs"></datalist>
 </main>
 <script src="export.js"></script>
