@@ -185,6 +185,7 @@ async function run() {
   if (!files.length) throw new Error('Nothing downloaded');
 
   progress(0, 0, 'Zipping…');
+  if (!user) log('Note: couldn\'t read your name from gradescope.com/account/edit, so it\'s left out of the folder name');
   const top = ['gradescope_export', slug(user), stamp(new Date())].filter(Boolean).join('_');
   const blob = new Blob([zip(files.map(([n, d]) => [`${top}/${n}`, d]))], { type: 'application/zip' });
   Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: top + '.zip' }).click();
@@ -200,8 +201,8 @@ async function userName() {
   } catch { return ''; }
 }
 
-// Local time -> 2026-11-05_1642
-const stamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; };
+// Local time -> 2026-11-05_16-42-07 (no colons: not allowed in Windows/macOS filenames)
+const stamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`; };
 
 // Graded PDF is generated on demand; poll status until complete.
 async function gradedPdf(paths) {
