@@ -7,6 +7,17 @@ const log = s => { $('log').textContent += s + '\n'; };
 const get = (path, opts = {}) => fetch(GS + path, { credentials: 'include', ...opts });
 const parse = html => new DOMParser().parseFromString(html, 'text/html');
 
+// User edits: { term|name|prof: {courseId: v}, sub: {path: v} }, kept across sessions.
+// Older builds stored terms alone in localStorage.termOverrides; fold those in.
+const edits = (() => { try {
+  const e = JSON.parse(localStorage.edits || '{}');
+  e.term = { ...JSON.parse(localStorage.termOverrides || '{}'), ...e.term };
+  return e;
+} catch { return {}; } })();
+const val = (kind, key, orig) => edits[kind]?.[key] || orig || '';
+const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c.name), profOf = c => val('prof', c.id, c.prof), subOf = s => val('sub', s.path, s.name);
+let editing = false;
+
 // courses: id -> { id, name, term, subs: null | [{name, path}], picked: Set(path), all: bool }
 const courses = new Map();
 
@@ -29,10 +40,12 @@ const courses = new Map();
     else c.all = true;
     render();
   }
+  // Load every course in the background so profs show up.
+  await Promise.all([...courses.values()].map(c => load(c).catch(() => {})));
+  render();
 })().catch(e => { $('ctx').textContent = 'Error: ' + e.message; });
 
-async function load(c) {
-  if (c.subs) return;
+const load = c => c.loading ??= (async () => {
   const doc = parse(await (await get('/courses/' + c.id)).text());
   c.term = doc.querySelector('.courseHeader--term')?.textContent.trim() || c.term;
   c.prof = lastName(doc.querySelector('li[id^=sidebar-instructor-] .sidebar--menuItemLabel')?.textContent || '');
@@ -41,21 +54,25 @@ async function load(c) {
     return a && { name: tr.querySelector('th').textContent.trim(), path: a.getAttribute('href') };
   }).filter(Boolean);
   if (c.all) { c.subs.forEach(s => c.picked.add(s.path)); c.all = false; }
-}
+})().catch(e => { c.loading = null; throw e; });
 
-const state = c => c.all ? 'all' : !c.subs ? 'none' : c.picked.size === 0 ? 'none' : c.picked.size === c.subs.length ? 'all' : 'some';
+const isPicked = c => ['all', 'some'].includes(state(c));
+const state = c => c.all ? 'all' : !c.subs ? 'none' : !c.subs.length ? 'empty' : c.picked.size === 0 ? 'none' : c.picked.size === c.subs.length ? 'all' : 'some';
 
 function render() {
+  if (editing) return; // blur re-renders when the edit closes
   const root = $('courses'); root.innerHTML = '';
   for (const c of courses.values()) {
     const st = state(c);
     const row = document.createElement('div'); row.className = 'course';
-    row.innerHTML = `<label><input type="checkbox"> <span class="name"></span> <span class="term"></span></label>
+    row.innerHTML = `<label><input type="checkbox"> <span class="name"></span> <span class="prof"></span> <span class="term"></span></label>
       <button class="toggle" aria-label="Show assignments">${c.open ? '▾' : '▸'}</button><div class="subs"></div>`;
-    row.querySelector('.name').textContent = c.name;
-    row.querySelector('.term').textContent = c.term;
+    editable(row.querySelector('.name'), 'name', c.id, c.name);
+    if (c.subs) editable(row.querySelector('.prof'), 'prof', c.id, c.prof, 'profs');
+    else row.querySelector('.prof').remove();
+    editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
     const cb = row.querySelector('input');
-    cb.checked = st === 'all'; cb.indeterminate = st === 'some';
+    cb.checked = st === 'all'; cb.indeterminate = st === 'some'; cb.disabled = st === 'empty';
     cb.onchange = async () => {
       if (c.subs) { c.picked = new Set(cb.checked ? c.subs.map(s => s.path) : []); }
       else c.all = cb.checked;
@@ -68,7 +85,7 @@ function render() {
       for (const s of c.subs) {
         const l = document.createElement('label');
         l.innerHTML = '<input type="checkbox"> <span></span>';
-        l.querySelector('span').textContent = s.name;
+        editable(l.querySelector('span'), 'sub', s.path, s.name);
         const scb = l.querySelector('input'); scb.checked = c.picked.has(s.path);
         scb.onchange = () => { scb.checked ? c.picked.add(s.path) : c.picked.delete(s.path); render(); };
         box.appendChild(l);
@@ -76,28 +93,79 @@ function render() {
     }
     root.appendChild(row);
   }
+  const sts = [...courses.values()].map(state).filter(x => x !== 'empty');
+  $('all').checked = sts.length > 0 && sts.every(x => x === 'all');
+  $('all').indeterminate = !$('all').checked && sts.some(x => x !== 'none');
+  const years = new Set([...courses.values()].map(c => termOf(c).match(/\d{4}/)?.[0]).filter(Boolean));
+  const known = new Set([...courses.values()].map(termOf).filter(Boolean));
+  for (const y of years) for (const q of ['Winter', 'Spring', 'Summer', 'Fall']) known.add(`${q} ${y}`);
+  const opts = vals => [...new Set(vals)].filter(Boolean).map(v => Object.assign(document.createElement('option'), { value: v }));
+  $('profs').replaceChildren(...opts([...courses.values()].map(profOf)));
+  $('terms').replaceChildren(...[...known].map(t => Object.assign(document.createElement('option'), { value: t })));
   const n = [...courses.values()].reduce((t, c) => t + (c.all ? (c.subs?.length ?? 1) : c.picked.size), 0);
   $('go').disabled = n === 0;
-  $('go').textContent = n ? `Export ${[...courses.values()].filter(c => state(c) !== 'none').length} course(s) to ZIP` : 'Select something to export';
+  $('go').textContent = n ? `Export ${[...courses.values()].filter(c => isPicked(c)).length} course(s) to ZIP` : 'Select something to export';
+}
+
+const busy = on => { $('go').hidden = on; $('bar').hidden = $('pct').hidden = !on; };
+const progress = (done, total, text) => {
+  if (total) { $('bar').max = total; $('bar').value = done; } else $('bar').removeAttribute('value');
+  $('pct').textContent = text ?? `${done} / ${total}`;
+};
+
+$('all').onchange = () => {
+  const on = $('all').checked;
+  for (const c of courses.values()) { if (c.subs) c.picked = new Set(on ? c.subs.map(s => s.path) : []); else c.all = on; }
+  render();
+};
+
+// Show a value; clicking swaps in a text box (Enter/blur saves, Esc cancels, empty resets to Gradescope's value).
+function editable(span, kind, key, orig, list) {
+  span.textContent = val(kind, key, orig);
+  span.classList.add('editable');
+  span.onclick = e => {
+    e.preventDefault();
+    let cancel = false;
+    const inp = Object.assign(document.createElement('input'), { className: 'edit', value: span.textContent });
+    const fit = () => inp.size = Math.max(inp.value.length + 2, 12);
+    fit(); inp.oninput = fit;
+    inp.style.fontSize = getComputedStyle(span).fontSize;
+    if (list) inp.setAttribute('list', list);
+    inp.onkeydown = e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { cancel = true; inp.blur(); } };
+    inp.onblur = () => {
+      editing = false;
+      const v = inp.value.trim();
+      if (!cancel) {
+        edits[kind] ??= {};
+        if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
+        try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
+      }
+      render();
+    };
+    editing = true;
+    span.replaceWith(inp); inp.focus(); inp.select();
+  };
 }
 
 $('go').onclick = async () => {
-  $('go').disabled = true; $('log').textContent = '';
+  $('log').textContent = ''; busy(true); progress(0, 0, 'Loading…');
   try { await run(); } catch (e) { log('ERROR: ' + e.message); }
-  render();
+  busy(false); render();
 };
 
 async function run() {
   const wantOrig = $('orig').checked, wantGraded = $('graded').checked;
-  const picked = [...courses.values()].filter(c => state(c) !== 'none');
-  await Promise.all(picked.map(load));
+  const picked = [...courses.values()].filter(c => isPicked(c));
+  const [user] = await Promise.all([userName(), ...picked.map(load)]);
   const jobs = picked.flatMap(c => c.subs.filter(s => c.picked.has(s.path)).map(s => ({ c, s })));
   if (!jobs.length) throw new Error('Nothing selected');
   log(`${jobs.length} submission(s) across ${picked.length} course(s)`);
 
   const files = [];
-  await Promise.all(jobs.map(async ({ c, s }) => {
-    const dir = safe(c.name), base = fileBase(c, s.name);
+  let done = 0;
+  progress(0, jobs.length);
+  await Promise.all(jobs.map(async ({ c, s }) => { try {
+    const dir = fileBase(c), base = fileBase(c, subOf(s));
     const j = await (await get(s.path + '.json?content=react', { headers: { Accept: 'application/json' } })).json();
     const orig = wantOrig && j.paths.original_file_path && fetch(j.paths.original_file_path);
     const graded = wantGraded && j.paths.graded_pdf_path && gradedPdf(j.paths);
@@ -111,16 +179,30 @@ async function run() {
       const name = `${dir}/${base}_graded.pdf`;
       const buf = await graded;
       if (buf) { files.push([name, buf]); log('✓ ' + name); }
-      else log(`– ${s.name}: no graded copy`);
+      else log(`– ${subOf(s)}: no graded copy`);
     }
-  }));
+  } finally { progress(++done, jobs.length); } }));
   if (!files.length) throw new Error('Nothing downloaded');
 
-  const blob = new Blob([zip(files)], { type: 'application/zip' });
-  const zipName = picked.length === 1 ? safe(picked[0].name) : 'gradescope-export';
-  Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: zipName + '.zip' }).click();
+  progress(0, 0, 'Zipping…');
+  if (!user) log('Note: couldn\'t read your name from gradescope.com/account/edit, so it\'s left out of the folder name');
+  const top = ['gradescope_export', slug(user), stamp(new Date())].filter(Boolean).join('_');
+  const blob = new Blob([zip(files.map(([n, d]) => [`${top}/${n}`, d]))], { type: 'application/zip' });
+  Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: top + '.zip' }).click();
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
 }
+
+// Name from the account settings form; '' if it can't be read.
+async function userName() {
+  try {
+    const doc = parse(await (await get('/account/edit')).text());
+    const v = n => doc.querySelector(`[name="user[${n}]"]`)?.value?.trim() || '';
+    return v('name') || [v('first_name'), v('last_name')].filter(Boolean).join(' ');
+  } catch { return ''; }
+}
+
+// Local time -> 2026-11-05_16-42-07 (no colons: not allowed in Windows/macOS filenames)
+const stamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`; };
 
 // Graded PDF is generated on demand; poll status until complete.
 async function gradedPdf(paths) {
@@ -134,12 +216,11 @@ async function gradedPdf(paths) {
   return null;
 }
 
-// "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mt_mosleh_f16
+// "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mosleh_f16_mt (no assignment -> mae_174_mosleh_f16)
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
-const fileBase = (c, assignment) => [slug(c.name), abbr(assignment), slug(c.prof || ''), termCode(c.term)].filter(Boolean).join('_');
-const safe = s => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
+const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
 // "Last, First" or "First Last" -> Last
 const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
 
