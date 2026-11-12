@@ -6,10 +6,10 @@ const cvCourses = new Map();
 let slots = 6; const waiting = [];
 const slot = () => slots > 0 ? (slots--, Promise.resolve()) : new Promise(r => waiting.push(r));
 const free = () => waiting.length ? waiting.shift()() : slots++;
-async function cget(p) {
+async function cget(p, accept = 'application/json') {
   for (let i = 0; ; i++) {
     await slot();
-    let r; try { r = await fetch(p.startsWith('http') ? p : CV + p, { credentials: 'include', headers: { Accept: 'application/json' } }); } finally { free(); }
+    let r; try { r = await fetch(p.startsWith('http') ? p : CV + p, { credentials: 'include', headers: { Accept: accept } }); } finally { free(); }
     if (r.status === 403 && i < 4 && /rate limit/i.test(await r.clone().text())) { await new Promise(res => setTimeout(res, 2000 * (i + 1))); continue; }
     if (!r.ok) throw new Error(`${r.status} ${p}`);
     return r;
@@ -26,6 +26,7 @@ async function call(p) {
   }
   return out;
 }
+const chtml = async p => parse(await (await cget(p, 'text/html')).text());
 const bytes = async url => new Uint8Array(await (await cget(url)).arrayBuffer());
 const clean = s => (s || 'file').replace(/[\/\\:*?"<>|\x00-\x1f]+/g, '_').trim();
 
@@ -90,12 +91,28 @@ async function page(c, title, meta, body) {
       if (!got.has(id)) got.set(id, cvFile(c, id).then(f => (out.files.push(f), f[0])).catch(e => { log(`✗ file ${id} in ${title}: ${e.message}`); out.links.push(u.href); }));
       const name = await got.get(id);
       if (name) el.setAttribute(attr, encodeURIComponent(name));
-    } else if (el.tagName === 'A' && /^https?:$/.test(u.protocol)) out.links.push(u.href);
+    } else if (el.tagName === 'A' && /^https?:$/.test(u.protocol) && !u.href.endsWith('#')) out.links.push(u.href);
   }));
   const esc = s => String(s).replace(/[&<>"]/g, ch => `&#${ch.charCodeAt(0)};`);
   out.html = `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><h1>${esc(title)}</h1>` +
     (meta.length ? `<p>${meta.map(esc).join(' · ')}</p>` : '') + doc.body.innerHTML;
   return out;
+}
+
+// Classic quiz results (questions, embedded problem files, your uploads) only exist as HTML pages, one per attempt.
+async function quizResults(c, qid) {
+  const b = `/courses/${c.cid}/quizzes/${qid}`;
+  const main = await chtml(b).catch(() => null);
+  if (!main) return '';
+  const versions = [...new Set([...main.querySelectorAll('a[href*="history?version="]')].map(a => a.href.match(/version=(\d+)/)[1]))].sort((x, y) => x - y);
+  const parts = await Promise.all(versions.map(async v => {
+    const d = versions.length === 1 ? main : await chtml(`${b}/history?version=${v}`).catch(() => main);
+    const sub = d.querySelector('.quiz-submission') || d.querySelector('#questions')?.parentElement;
+    if (!sub) return '';
+    sub.querySelectorAll('script, .move, .links, .original_question_text, .screenreader-only, [style*="display: none"], [style*="display:none"]').forEach(e => e.remove());
+    return `<h2>Attempt ${v}</h2>` + sub.innerHTML;
+  }));
+  return parts.join('');
 }
 
 const when = d => d ? new Date(d).toLocaleString() : '';
@@ -106,16 +123,17 @@ const ex = {
     return page(c, p.title, [], p.body);
   },
   async Quizzes(c, x) {
-    return page(c, x.title, [x.due_at && 'Due ' + when(x.due_at), x.points_possible != null && x.points_possible + ' pts', x.html_url].filter(Boolean), x.description);
+    return page(c, x.title, [x.due_at && 'Due ' + when(x.due_at), x.points_possible != null && x.points_possible + ' pts', x.html_url].filter(Boolean), (x.description || '') + await quizResults(c, x.id));
   },
   async Assignments(c, x) {
-    const out = await page(c, x.name, [x.due_at && 'Due ' + when(x.due_at), x.points_possible != null && x.points_possible + ' pts', x.html_url].filter(Boolean), x.description);
+    const out = await page(c, x.name, [x.due_at && 'Due ' + when(x.due_at), x.points_possible != null && x.points_possible + ' pts', x.html_url].filter(Boolean),
+      (x.description || '') + (x.quiz_id ? await quizResults(c, x.quiz_id) : ''));
     const s = await cjson(`/api/v1/courses/${c.cid}/assignments/${x.id}/submissions/self`).catch(() => null);
     for (const a of s?.attachments || []) {
       try { out.files.push(['submission/' + clean(a.display_name), await bytes(a.url)]); }
       catch (e) { log(`✗ submission file ${a.display_name}: ${e.message}`); out.links.push(a.url); }
     }
-    if (s?.body) out.files.push(['submission/submission.html', `<!doctype html><meta charset="utf-8">${s.body}`]);
+    if (s?.body && !x.quiz_id) out.files.push(['submission/submission.html', `<!doctype html><meta charset="utf-8">${s.body}`]);
     if (s?.url) out.links.push(s.url);
     return out;
   },

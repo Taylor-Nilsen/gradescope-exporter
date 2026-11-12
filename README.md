@@ -21,6 +21,7 @@ Graded copies only exist for graded assignments; ungraded ones are skipped with 
 How items are saved:
 - An item with nothing attached is a single `.html` file (`assignments/mae_174_mosleh_f16_hw_1.html`)
 - An item with linked or embedded Canvas files, attachments, or your submission gets its own folder named after the item, with the `.html`, every linked file, your submitted files under `submission/`, and any outside links in `links.txt`
+- Quizzes include every attempt: the questions, any files embedded in them, your uploaded answers, and your score
 - Modules are a folder each, items numbered in module order; link and external tool items are `.txt` files holding the URL
 - Course files keep their Canvas folder structure under `files/`
 - Anything that fails to download (locked, no access) is logged and its URL goes in `links.txt` instead
