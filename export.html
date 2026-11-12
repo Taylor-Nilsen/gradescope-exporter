@@ -46,12 +46,22 @@
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
   .subs label { padding:3px 0 }
+  .subs .cat { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding-top:8px }
+  .subs .item { padding-left:26px }
+  .tabs { display:flex; gap:6px; margin:10px 0 8px }
+  .tabs button { margin:0; padding:6px 16px; background:none; border-color:var(--line); font-weight:500 }
+  .tabs button.on { background:var(--blue); border-color:var(--blue-dark); font-weight:600 }
+  .row { display:flex; gap:10px }
+  .row .edit { flex:1; font-size:15px; padding:8px 10px }
+  .row button { margin:0 }
 </style>
 <main>
   <header><img src="icons/icon48.png" alt=""><h1>Gradescope Exporter</h1></header>
+  <nav class="tabs"><button data-m="gs">Gradescope</button><button data-m="cv">Canvas</button></nav>
   <p id="ctx">Reading page…</p>
+  <section id="cvconnect" hidden><h2>Canvas address</h2><div class="row"><input id="cvurl" class="edit" placeholder="canvas.school.edu"><button id="cvgo">Connect</button></div></section>
   <section><h2 class="head">Courses <label><input type="checkbox" id="all"> Select all</label></h2><div id="courses"></div></section>
-  <section><h2>Files</h2>
+  <section id="gsfiles"><h2>Files</h2>
     <label><input type="checkbox" id="orig" checked> Original (what you submitted)</label>
     <label><input type="checkbox" id="graded" checked> Graded copy (with annotations, where graded)</label>
   </section>
@@ -60,4 +70,5 @@
   <datalist id="terms"></datalist>
   <datalist id="profs"></datalist>
 </main>
+<script src="canvas.js"></script>
 <script src="export.js"></script>
