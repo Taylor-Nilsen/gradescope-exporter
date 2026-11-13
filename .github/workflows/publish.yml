@@ -18,7 +18,7 @@ jobs:
         run: |
           v="$(jq -r .version manifest.json).${{ github.run_number }}"
           jq --arg v "$v" '.version = $v' manifest.json > m.json && mv m.json manifest.json
-          zip -r ext.zip manifest.json background.js export.html export.js icons
+          zip -r ext.zip manifest.json background.js export.html export.js canvas.js icons
           echo "Version $v"
 
       - uses: google-github-actions/auth@v2

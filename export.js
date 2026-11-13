@@ -19,33 +19,40 @@ const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c
 let editing = false;
 
 // courses: id -> { id, name, term, subs: null | [{name, path}], picked: Set(path), all: bool }
-const courses = new Map();
+const gsCourses = new Map();
+let courses = gsCourses, mode = 'gs';
+const ctx = { gs: 'Reading page…', cv: '' };
+const setCtx = (m, t) => { ctx[m] = t; if (mode === m) $('ctx').textContent = t; };
 
 (async function init() {
   const doc = parse(await (await get('/')).text());
   for (const a of doc.querySelectorAll('a.courseBox')) {
     const id = a.getAttribute('href').match(/\d+/)[0];
-    courses.set(id, {
+    gsCourses.set(id, {
       id, name: a.querySelector('.courseBox--shortname')?.textContent.trim() || id,
       term: a.closest('.courseList--coursesForTerm')?.previousElementSibling?.textContent.trim() || '',
       subs: null, picked: new Set(), all: false,
     });
   }
-  if (!courses.size) { $('ctx').textContent = 'No courses found. Are you logged in to Gradescope?'; return; }
-  $('ctx').textContent = `${courses.size} courses`;
+  if (!gsCourses.size) { setCtx('gs', 'No courses found. Are you logged in to Gradescope?'); return; }
+  setCtx('gs', `${gsCourses.size} courses`);
   render();
-  if (openCourse && courses.has(openCourse)) {
-    const c = courses.get(openCourse);
+  if (openCourse && gsCourses.has(openCourse)) {
+    const c = gsCourses.get(openCourse);
     if (openSub) { await load(c); const s = c.subs.find(s => s.path.endsWith('/submissions/' + openSub)); if (s) c.picked.add(s.path); c.open = true; }
     else c.all = true;
     render();
   }
   // Load every course in the background so profs show up.
-  await Promise.all([...courses.values()].map(c => load(c).catch(() => {})));
+  await Promise.all([...gsCourses.values()].map(c => load(c).catch(() => {})));
   render();
-})().catch(e => { $('ctx').textContent = 'Error: ' + e.message; });
+})().catch(e => { setCtx('gs', 'Error: ' + e.message); });
 
-const load = c => c.loading ??= (async () => {
+const load = c => c.loading ??= (c.cv ? cvList : gsList)(c).then(() => {
+  if (c.all) { c.subs.forEach(s => c.picked.add(s.path)); c.all = false; }
+}).catch(e => { c.loading = null; throw e; });
+
+async function gsList(c) {
   const doc = parse(await (await get('/courses/' + c.id)).text());
   c.term = doc.querySelector('.courseHeader--term')?.textContent.trim() || c.term;
   c.prof = lastName(doc.querySelector('li[id^=sidebar-instructor-] .sidebar--menuItemLabel')?.textContent || '');
@@ -53,8 +60,8 @@ const load = c => c.loading ??= (async () => {
     const a = tr.querySelector('th a');
     return a && { name: tr.querySelector('th').textContent.trim(), path: a.getAttribute('href') };
   }).filter(Boolean);
-  if (c.all) { c.subs.forEach(s => c.picked.add(s.path)); c.all = false; }
-})().catch(e => { c.loading = null; throw e; });
+}
+
 
 const isPicked = c => ['all', 'some'].includes(state(c));
 const state = c => c.all ? 'all' : !c.subs ? 'none' : !c.subs.length ? 'empty' : c.picked.size === 0 ? 'none' : c.picked.size === c.subs.length ? 'all' : 'some';
@@ -68,7 +75,7 @@ function render() {
     row.innerHTML = `<label><input type="checkbox"> <span class="name"></span> <span class="prof"></span> <span class="term"></span></label>
       <button class="toggle" aria-label="Show assignments">${c.open ? '▾' : '▸'}</button><div class="subs"></div>`;
     editable(row.querySelector('.name'), 'name', c.id, c.name);
-    if (c.subs) editable(row.querySelector('.prof'), 'prof', c.id, c.prof, 'profs');
+    if ('prof' in c) editable(row.querySelector('.prof'), 'prof', c.id, c.prof, 'profs');
     else row.querySelector('.prof').remove();
     editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
     const cb = row.querySelector('input');
@@ -81,9 +88,19 @@ function render() {
     row.querySelector('.toggle').onclick = async () => { c.open = !c.open; if (c.open) await load(c); render(); };
     if (c.open && c.subs) {
       const box = row.querySelector('.subs');
-      if (!c.subs.length) box.textContent = 'No submissions';
+      if (!c.subs.length) box.textContent = c.cv ? 'Nothing found' : 'No submissions';
+      let cat;
       for (const s of c.subs) {
-        const l = document.createElement('label');
+        if (s.cat && s.cat !== cat) {
+          cat = s.cat;
+          const inCat = c.subs.filter(x => x.cat === s.cat), n = inCat.filter(x => c.picked.has(x.path)).length;
+          const h = document.createElement('label'); h.className = 'cat';
+          h.innerHTML = `<input type="checkbox"> ${cat}`;
+          const hcb = h.querySelector('input'); hcb.checked = n === inCat.length; hcb.indeterminate = n > 0 && n < inCat.length;
+          hcb.onchange = () => { inCat.forEach(x => hcb.checked ? c.picked.add(x.path) : c.picked.delete(x.path)); render(); };
+          box.appendChild(h);
+        }
+        const l = document.createElement('label'); if (s.cat) l.className = 'item';
         l.innerHTML = '<input type="checkbox"> <span></span>';
         editable(l.querySelector('span'), 'sub', s.path, s.name);
         const scb = l.querySelector('input'); scb.checked = c.picked.has(s.path);
@@ -149,7 +166,7 @@ function editable(span, kind, key, orig, list) {
 
 $('go').onclick = async () => {
   $('log').textContent = ''; busy(true); progress(0, 0, 'Loading…');
-  try { await run(); } catch (e) { log('ERROR: ' + e.message); }
+  try { await (mode === 'cv' ? cvRun : run)(); } catch (e) { log('ERROR: ' + e.message); }
   busy(false); render();
 };
 
@@ -241,3 +258,29 @@ function zip(files) {
   const cd = central.flat(), eocd = [...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cd.length), ...u32(off), ...u16(0)];
   return new Blob([...parts, new Uint8Array(cd), new Uint8Array(eocd)]);
 }
+
+// Canvas: use the saved instance, else the tab we were opened from. Connect silently if we already have access.
+const cvGuess = (() => { try { return localStorage.canvas; } catch {} })() || (/^https:/.test(start) && !start.includes('gradescope.com') ? new URL(start).origin : '');
+$('cvurl').value = cvGuess.replace(/^https:\/\//, '');
+const switchTo = m => {
+  mode = m; courses = m === 'cv' ? cvCourses : gsCourses;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('gsfiles').hidden = m !== 'gs'; $('cvconnect').hidden = m !== 'cv' || cvCourses.size > 0;
+  $('ctx').textContent = ctx[m];
+  render();
+};
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => switchTo(b.dataset.m));
+async function cvStart(origin) {
+  setCtx('cv', 'Connecting to ' + new URL(origin).host + '…');
+  try { await cvConnect(origin); setCtx('cv', `${cvCourses.size} courses on ${new URL(origin).host}`); }
+  catch (e) { setCtx('cv', `Couldn't read Canvas at ${new URL(origin).host} (${e.message}). Are you logged in?`); }
+  switchTo(mode);
+}
+$('cvgo').onclick = async () => {
+  let origin; try { origin = new URL(/^https?:/.test($('cvurl').value) ? $('cvurl').value : 'https://' + $('cvurl').value.trim()).origin; } catch { return setCtx('cv', 'Enter your Canvas address, like canvas.school.edu'); }
+  if (await chrome.permissions.request({ origins: [origin + '/*'] })) cvStart(origin);
+  else setCtx('cv', 'Permission denied for ' + origin);
+};
+setCtx('cv', 'Enter your Canvas address and connect');
+switchTo(cvGuess && cvGuess === (/^https:/.test(start) ? new URL(start).origin : '') ? 'cv' : 'gs');
+if (cvGuess) chrome.permissions.contains({ origins: [cvGuess + '/*'] }).then(ok => ok && cvStart(cvGuess));
