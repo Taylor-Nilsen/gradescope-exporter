@@ -21,12 +21,21 @@ jobs:
           zip -r ext.zip manifest.json background.js export.html export.js icons
           echo "Version $v"
 
-      - uses: google-github-actions/auth@v2
+      # Mint the token straight from the SA key; avoids needing the IAM Credentials API.
+      - name: Get access token
         id: auth
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          pip install -q google-auth requests
+          t=$(python3 -c '
+          import json, os
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          c = service_account.Credentials.from_service_account_info(json.loads(os.environ["KEY"]), scopes=["https://www.googleapis.com/auth/chromewebstore"])
+          c.refresh(Request()); print(c.token)')
+          echo "::add-mask::$t"
+          echo "access_token=$t" >> "$GITHUB_OUTPUT"
 
       - name: Upload and publish
         env:
