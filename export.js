@@ -15,6 +15,11 @@ const edits = (() => { try {
   return e;
 } catch { return {}; } })();
 const val = (kind, key, orig) => edits[kind]?.[key] || orig || '';
+const save = (kind, key, orig, v) => {
+  edits[kind] ??= {};
+  if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
+  try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
+};
 const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c.name), profOf = c => val('prof', c.id, c.prof), subOf = s => val('sub', s.path, s.name);
 let editing = false;
 
@@ -135,11 +140,7 @@ function editable(span, kind, key, orig, list) {
     inp.onblur = () => {
       editing = false;
       const v = inp.value.trim();
-      if (!cancel) {
-        edits[kind] ??= {};
-        if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
-        try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
-      }
+      if (!cancel) save(kind, key, orig, v);
       render();
     };
     editing = true;
@@ -157,6 +158,7 @@ async function run() {
   const wantOrig = $('orig').checked, wantGraded = $('graded').checked;
   const picked = [...courses.values()].filter(c => isPicked(c));
   const [user] = await Promise.all([userName(), ...picked.map(load)]);
+  if (!await confirmNames(picked)) { log('Cancelled'); return; }
   const jobs = picked.flatMap(c => c.subs.filter(s => c.picked.has(s.path)).map(s => ({ c, s })));
   if (!jobs.length) throw new Error('Nothing selected');
   log(`${jobs.length} submission(s) across ${picked.length} course(s)`);
@@ -190,6 +192,38 @@ async function run() {
   const blob = new Blob([zip(files.map(([n, d]) => [`${top}/${n}`, d]))], { type: 'application/zip' });
   Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: top + '.zip' }).click();
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
+}
+
+// Course = dept code + number ("MAE 102", "CSE 8A"); prof = one last name ("Mosleh").
+const CODE = /\p{L}{2,5}\s*\d{1,3}\p{L}{0,2}/u;
+const odd = { name: v => !new RegExp(`^${CODE.source}$`, 'u').test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
+const guess = { name: v => v.match(CODE)?.[0] || v, prof: v => v && lastName(v) };
+const label = { name: 'Course', prof: 'Prof' };
+
+// Popup listing picked courses whose name or prof looks off; resolves false on Cancel.
+async function confirmNames(picked) {
+  const bad = picked.flatMap(c => ['name', 'prof'].filter(k => !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k]))).map(k => ({ c, k })));
+  if (!bad.length) return true;
+  const d = $('check'), rows = d.querySelector('.rows');
+  rows.replaceChildren(...bad.map(({ c, k }) => {
+    const l = document.createElement('label');
+    l.innerHTML = `<span></span><input class="edit">`;
+    l.firstChild.textContent = k === 'prof' ? `Prof for ${nameOf(c)}` : `Course, currently "${nameOf(c)}"`;
+    const inp = l.lastChild; inp.value = guess[k](val(k, c.id, c[k])); inp.placeholder = label[k];
+    if (k === 'prof') inp.setAttribute('list', 'profs');
+    inp.dataset.k = k; inp.dataset.id = c.id;
+    return l;
+  }));
+  d.returnValue = ''; d.showModal();
+  await new Promise(r => d.addEventListener('close', r, { once: true }));
+  if (d.returnValue !== 'ok') return false;
+  for (const inp of rows.querySelectorAll('input')) {
+    const { k, id } = inp.dataset;
+    (edits.ok ??= {})[`${k}:${id}`] = true;
+    save(k, id, courses.get(id)[k], inp.value.trim());
+  }
+  render();
+  return true;
 }
 
 // Name from the account settings form; '' if it can't be read.
