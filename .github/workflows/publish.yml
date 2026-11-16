@@ -29,10 +29,12 @@ jobs:
         run: |
           pip install -q google-auth requests
           t=$(python3 -c '
-          import json, os
+          import json, os, sys
           from google.oauth2 import service_account
           from google.auth.transport.requests import Request
-          c = service_account.Credentials.from_service_account_info(json.loads(os.environ["KEY"]), scopes=["https://www.googleapis.com/auth/chromewebstore"])
+          k = json.loads(os.environ["KEY"])
+          print("Service account:", k["client_email"], file=sys.stderr)
+          c = service_account.Credentials.from_service_account_info(k, scopes=["https://www.googleapis.com/auth/chromewebstore"])
           c.refresh(Request()); print(c.token)')
           echo "::add-mask::$t"
           echo "access_token=$t" >> "$GITHUB_OUTPUT"
