@@ -31,7 +31,7 @@ const courses = new Map();
   for (const a of doc.querySelectorAll('a.courseBox')) {
     const id = a.getAttribute('href').match(/\d+/)[0];
     courses.set(id, {
-      id, name: a.querySelector('.courseBox--shortname')?.textContent.trim() || id,
+      id, name: courseCode(a.querySelector('.courseBox--shortname')?.textContent, a.querySelector('.courseBox--name')?.textContent) || id,
       term: a.closest('.courseList--coursesForTerm')?.previousElementSibling?.textContent.trim() || '',
       subs: null, picked: new Set(), all: false,
     });
@@ -53,6 +53,7 @@ const courses = new Map();
 const load = c => c.loading ??= (async () => {
   const doc = parse(await (await get('/courses/' + c.id)).text());
   c.term = doc.querySelector('.courseHeader--term')?.textContent.trim() || c.term;
+  if (odd.name(c.name)) c.name = courseCode(c.name, doc.querySelector('.courseHeader--title')?.textContent);
   c.prof = lastName(doc.querySelector('li[id^=sidebar-instructor-] .sidebar--menuItemLabel')?.textContent || '');
   c.subs = [...doc.querySelectorAll('#assignments-student-table tbody tr')].map(tr => {
     const a = tr.querySelector('th a');
@@ -241,8 +242,21 @@ const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, 
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
-// "Last, First" or "First Last" -> Last
-const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
+// "Last, First" or "Dr. First Last PhD" -> Last
+const lastName = s => {
+  s = s.replace(/\b(dr|prof|professor|mr|mrs|ms)\.?\s+/gi, '').replace(/,?\s+(ph\.?d\.?|md|jr\.?|sr\.?|ii|iii|iv)\s*$/i, '').trim();
+  return (s.includes(',') ? s.split(',')[0] : s.split(/\s+/).pop()).trim();
+};
+// Pull "MAE 102" out of names like "MAE102 FA25", "FA25 MAE-102 A00", "Thermo (MAE 102)".
+// Tries each source in order; returns the first source as-is if none has a code.
+// Term and section words that look like codes: "FA25", "Lec 01", "Sec 2".
+const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz)$/i;
+function courseCode(...srcs) {
+  srcs = srcs.map(x => (x || '').trim()).filter(Boolean);
+  for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,5})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
+    if (!SKIP.test(m[1])) return `${m[1]} ${m[2]}`;
+  return srcs[0] || '';
+}
 
 // Minimal STORE-only zip writer (PDFs don't compress anyway).
 const crcTable = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xEDB88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
