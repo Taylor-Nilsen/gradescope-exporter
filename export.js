@@ -78,11 +78,12 @@ function render() {
     editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
     const issues = ['name', 'prof'].filter(k => (k === 'name' || c.subs) && !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k])));
     if (issues.length) {
-      const w = document.createElement('span'); w.className = 'warn';
-      w.innerHTML = `<span></span> <button>Ignore</button>`;
-      w.firstChild.textContent = `⚠ check ${issues.map(k => k === 'name' ? 'course' : 'prof').join(' & ')}`;
-      w.title = issues.map(k => hint[k]).join('\n');
-      w.querySelector('button').onclick = e => {
+      for (const k of issues) {
+        const f = row.querySelector('.' + k); f.classList.add('bad'); f.title = hint[k];
+        f.before(Object.assign(document.createElement('span'), { className: 'flag', textContent: '⚠', title: hint[k] }));
+      }
+      const w = Object.assign(document.createElement('button'), { className: 'ignore', textContent: 'Ignore' });
+      w.onclick = e => {
         e.preventDefault();
         for (const k of issues) (edits.ok ??= {})[`${k}:${c.id}`] = true;
         try { localStorage.edits = JSON.stringify(edits); } catch {}
@@ -207,10 +208,9 @@ async function run() {
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
 }
 
-// Course = dept code + number ("MAE 102", "CSE 8A"); prof = one last name ("Mosleh").
-const CODE = /\p{L}{2,5}\s*\d{1,3}\p{L}{0,2}/u;
-const odd = { name: v => !new RegExp(`^${CODE.source}$`, 'u').test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
-const hint = { name: 'Course name should be just dept code + number, like MAE 102. Click it to change.', prof: 'Prof should be just a last name. Click it to change.' };
+// Course = dept code, one space/_/-, number ("mae 82", "mae_82", "cse-8a"); prof = one last name ("Mosleh").
+const odd = { name: v => !/^\p{L}{2,5}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
+const hint = { name: 'Course should be just dept code and number, like mae 82, mae_82 or mae-82. Click to change.', prof: 'Prof should be just a last name. Click to change.' };
 
 // Name from the account settings form; '' if it can't be read.
 async function userName() {

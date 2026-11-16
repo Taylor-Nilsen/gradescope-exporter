@@ -46,10 +46,12 @@
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
   .subs label { padding:3px 0 }
-  .warn { font-size:12px; color:#a8661a; white-space:nowrap }
-  @media (prefers-color-scheme: dark) { .warn { color:#e0a458 } }
-  .warn button { font-size:12px; font-weight:400; color:var(--muted); background:none; border:0; padding:0 2px; margin:0; text-decoration:underline; cursor:pointer }
-  .warn button:hover:not(:disabled) { background:none; color:var(--ink) }
+  .flag { color:#b8741a; font-size:13px; margin-right:-6px }
+  .bad { color:var(--ink) !important; background:var(--field); border:1px solid #d9a35b; border-radius:4px; padding:1px 8px; min-width:7em; display:inline-block }
+  .bad:hover { border-color:var(--blue-dark) }
+  @media (prefers-color-scheme: dark) { .flag { color:#e0a458 } .bad { border-color:#9a6a2c } }
+  .ignore { font-size:12px; font-weight:400; color:var(--muted); background:none; border:0; padding:0 2px; margin:0; text-decoration:underline; cursor:pointer }
+  .ignore:hover:not(:disabled) { background:none; color:var(--ink) }
 </style>
 <main>
   <header><img src="icons/icon48.png" alt=""><h1>Gradescope Exporter</h1></header>
