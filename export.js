@@ -76,6 +76,20 @@ function render() {
     if (c.subs) editable(row.querySelector('.prof'), 'prof', c.id, c.prof, 'profs');
     else row.querySelector('.prof').remove();
     editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
+    const issues = ['name', 'prof'].filter(k => (k === 'name' || c.subs) && !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k])));
+    if (issues.length) {
+      const w = document.createElement('span'); w.className = 'warn';
+      w.innerHTML = `<span></span> <button>Ignore</button>`;
+      w.firstChild.textContent = `⚠ check ${issues.map(k => k === 'name' ? 'course' : 'prof').join(' & ')}`;
+      w.title = issues.map(k => hint[k]).join('\n');
+      w.querySelector('button').onclick = e => {
+        e.preventDefault();
+        for (const k of issues) (edits.ok ??= {})[`${k}:${c.id}`] = true;
+        try { localStorage.edits = JSON.stringify(edits); } catch {}
+        render();
+      };
+      row.querySelector('label').appendChild(w);
+    }
     const cb = row.querySelector('input');
     cb.checked = st === 'all'; cb.indeterminate = st === 'some'; cb.disabled = st === 'empty';
     cb.onchange = async () => {
@@ -158,7 +172,6 @@ async function run() {
   const wantOrig = $('orig').checked, wantGraded = $('graded').checked;
   const picked = [...courses.values()].filter(c => isPicked(c));
   const [user] = await Promise.all([userName(), ...picked.map(load)]);
-  if (!await confirmNames(picked)) { log('Cancelled'); return; }
   const jobs = picked.flatMap(c => c.subs.filter(s => c.picked.has(s.path)).map(s => ({ c, s })));
   if (!jobs.length) throw new Error('Nothing selected');
   log(`${jobs.length} submission(s) across ${picked.length} course(s)`);
@@ -197,34 +210,7 @@ async function run() {
 // Course = dept code + number ("MAE 102", "CSE 8A"); prof = one last name ("Mosleh").
 const CODE = /\p{L}{2,5}\s*\d{1,3}\p{L}{0,2}/u;
 const odd = { name: v => !new RegExp(`^${CODE.source}$`, 'u').test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
-const guess = { name: v => v.match(CODE)?.[0] || v, prof: v => v && lastName(v) };
-const label = { name: 'Course', prof: 'Prof' };
-
-// Popup listing picked courses whose name or prof looks off; resolves false on Cancel.
-async function confirmNames(picked) {
-  const bad = picked.flatMap(c => ['name', 'prof'].filter(k => !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k]))).map(k => ({ c, k })));
-  if (!bad.length) return true;
-  const d = $('check'), rows = d.querySelector('.rows');
-  rows.replaceChildren(...bad.map(({ c, k }) => {
-    const l = document.createElement('label');
-    l.innerHTML = `<span></span><input class="edit">`;
-    l.firstChild.textContent = k === 'prof' ? `Prof for ${nameOf(c)}` : `Course, currently "${nameOf(c)}"`;
-    const inp = l.lastChild; inp.value = guess[k](val(k, c.id, c[k])); inp.placeholder = label[k];
-    if (k === 'prof') inp.setAttribute('list', 'profs');
-    inp.dataset.k = k; inp.dataset.id = c.id;
-    return l;
-  }));
-  d.returnValue = ''; d.showModal();
-  await new Promise(r => d.addEventListener('close', r, { once: true }));
-  if (d.returnValue !== 'ok') return false;
-  for (const inp of rows.querySelectorAll('input')) {
-    const { k, id } = inp.dataset;
-    (edits.ok ??= {})[`${k}:${id}`] = true;
-    save(k, id, courses.get(id)[k], inp.value.trim());
-  }
-  render();
-  return true;
-}
+const hint = { name: 'Course name should be just dept code + number, like MAE 102. Click it to change.', prof: 'Prof should be just a last name. Click it to change.' };
 
 // Name from the account settings form; '' if it can't be read.
 async function userName() {

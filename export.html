@@ -46,16 +46,10 @@
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
   .subs label { padding:3px 0 }
-  dialog { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:18px 20px; max-width:440px; width:calc(100% - 32px) }
-  dialog::backdrop { background:rgb(0 0 0 / .35) }
-  dialog h2 { font-size:16px; margin:0 0 4px }
-  dialog p { color:var(--muted); font-size:13px; margin:0 0 12px }
-  dialog .rows label { display:grid; gap:4px; cursor:default }
-  dialog .rows span { font-size:13px; color:var(--muted) }
-  dialog .rows .edit { font-size:14px; padding:6px 8px }
-  dialog .btns { display:flex; justify-content:flex-end; gap:10px; margin-top:14px }
-  dialog .btns button { margin:0; padding:8px 18px }
-  dialog .btns .plain { background:none; border-color:var(--line) }
+  .warn { font-size:12px; color:#a8661a; white-space:nowrap }
+  @media (prefers-color-scheme: dark) { .warn { color:#e0a458 } }
+  .warn button { font-size:12px; font-weight:400; color:var(--muted); background:none; border:0; padding:0 2px; margin:0; text-decoration:underline; cursor:pointer }
+  .warn button:hover:not(:disabled) { background:none; color:var(--ink) }
 </style>
 <main>
   <header><img src="icons/icon48.png" alt=""><h1>Gradescope Exporter</h1></header>
@@ -69,11 +63,5 @@
   <pre id="log"></pre>
   <datalist id="terms"></datalist>
   <datalist id="profs"></datalist>
-  <dialog id="check"><form method="dialog">
-    <h2>Check these names</h2>
-    <p>They go into every file name. Fix anything that's wrong, or leave it and export.</p>
-    <div class="rows"></div>
-    <div class="btns"><button class="plain" value="">Cancel</button><button value="ok">Export</button></div>
-  </form></dialog>
 </main>
 <script src="export.js"></script>
