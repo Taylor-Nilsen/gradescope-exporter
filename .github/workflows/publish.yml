@@ -21,21 +21,34 @@ jobs:
           zip -r ext.zip manifest.json background.js export.html export.js canvas.js icons
           echo "Version $v"
 
-      - uses: google-github-actions/auth@v2
+      # Mint the token straight from the SA key; avoids needing the IAM Credentials API.
+      - name: Get access token
         id: auth
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          pip install -q google-auth requests
+          t=$(python3 -c '
+          import json, os, sys
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          k = json.loads(os.environ["KEY"])
+          print("Service account:", k["client_email"], file=sys.stderr)
+          c = service_account.Credentials.from_service_account_info(k, scopes=["https://www.googleapis.com/auth/chromewebstore"])
+          c.refresh(Request()); print(c.token)')
+          echo "::add-mask::$t"
+          echo "access_token=$t" >> "$GITHUB_OUTPUT"
 
       - name: Upload and publish
         env:
           TOKEN: ${{ steps.auth.outputs.access_token }}
           ITEM: publishers/${{ vars.CWS_PUBLISHER_ID }}/items/${{ vars.CWS_EXTENSION_ID }}
         run: |
-          r=$(curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -T ext.zip \
+          r=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -T ext.zip \
             "https://chromewebstore.googleapis.com/upload/v2/$ITEM:upload")
           echo "$r"
           echo "$r" | grep -qE 'SUCCEEDED|IN_PROGRESS'
-          curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
-            "https://chromewebstore.googleapis.com/v2/$ITEM:publish"
+          r=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" \
+            "https://chromewebstore.googleapis.com/v2/$ITEM:publish")
+          echo "$r"
+          ! echo "$r" | grep -q '"error"'

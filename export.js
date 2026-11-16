@@ -15,6 +15,11 @@ const edits = (() => { try {
   return e;
 } catch { return {}; } })();
 const val = (kind, key, orig) => edits[kind]?.[key] || orig || '';
+const save = (kind, key, orig, v) => {
+  edits[kind] ??= {};
+  if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
+  try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
+};
 const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c.name), profOf = c => val('prof', c.id, c.prof), subOf = s => val('sub', s.path, s.name);
 let editing = false;
 
@@ -29,7 +34,7 @@ const setCtx = (m, t) => { ctx[m] = t; if (mode === m) $('ctx').textContent = t;
   for (const a of doc.querySelectorAll('a.courseBox')) {
     const id = a.getAttribute('href').match(/\d+/)[0];
     gsCourses.set(id, {
-      id, name: a.querySelector('.courseBox--shortname')?.textContent.trim() || id,
+      id, name: courseCode(a.querySelector('.courseBox--shortname')?.textContent, a.querySelector('.courseBox--name')?.textContent) || id,
       term: a.closest('.courseList--coursesForTerm')?.previousElementSibling?.textContent.trim() || '',
       subs: null, picked: new Set(), all: false,
     });
@@ -55,6 +60,7 @@ const load = c => c.loading ??= (c.cv ? cvList : gsList)(c).then(() => {
 async function gsList(c) {
   const doc = parse(await (await get('/courses/' + c.id)).text());
   c.term = doc.querySelector('.courseHeader--term')?.textContent.trim() || c.term;
+  if (odd.name(c.name)) c.name = courseCode(c.name, doc.querySelector('.courseHeader--title')?.textContent);
   c.prof = lastName(doc.querySelector('li[id^=sidebar-instructor-] .sidebar--menuItemLabel')?.textContent || '');
   c.subs = [...doc.querySelectorAll('#assignments-student-table tbody tr')].map(tr => {
     const a = tr.querySelector('th a');
@@ -78,6 +84,19 @@ function render() {
     if ('prof' in c) editable(row.querySelector('.prof'), 'prof', c.id, c.prof, 'profs');
     else row.querySelector('.prof').remove();
     editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
+    const issues = ['name', 'prof'].filter(k => (k === 'name' || c.subs) && !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k])));
+    if (issues.length) {
+      for (const k of issues) { const f = row.querySelector('.' + k); f.classList.add('bad'); f.title = hint[k]; }
+      row.prepend(Object.assign(document.createElement('span'), { className: 'flag', textContent: '⚠', title: issues.map(k => hint[k]).join('\n') }));
+      const w = Object.assign(document.createElement('button'), { className: 'ignore', textContent: 'Ignore' });
+      w.onclick = e => {
+        e.preventDefault();
+        for (const k of issues) (edits.ok ??= {})[`${k}:${c.id}`] = true;
+        try { localStorage.edits = JSON.stringify(edits); } catch {}
+        render();
+      };
+      row.querySelector('label').appendChild(w);
+    }
     const cb = row.querySelector('input');
     cb.checked = st === 'all'; cb.indeterminate = st === 'some'; cb.disabled = st === 'empty';
     cb.onchange = async () => {
@@ -152,11 +171,7 @@ function editable(span, kind, key, orig, list) {
     inp.onblur = () => {
       editing = false;
       const v = inp.value.trim();
-      if (!cancel) {
-        edits[kind] ??= {};
-        if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
-        try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
-      }
+      if (!cancel) save(kind, key, orig, v);
       render();
     };
     editing = true;
@@ -209,6 +224,10 @@ async function run() {
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
 }
 
+// Course = dept code, one space/_/-, number ("mae 82", "mae_82", "cse-8a"); prof = one last name ("Mosleh").
+const odd = { name: v => !/^\p{L}{2,5}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
+const hint = { name: 'Course should be just dept code and number, like mae 82, mae_82 or mae-82. Click to change.', prof: 'Prof should be just a last name. Click to change.' };
+
 // Name from the account settings form; '' if it can't be read.
 async function userName() {
   try {
@@ -238,8 +257,21 @@ const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, 
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
-// "Last, First" or "First Last" -> Last
-const lastName = s => (s.includes(',') ? s.split(',')[0] : s.trim().split(/\s+/).pop()).trim();
+// "Last, First" or "Dr. First Last PhD" -> Last
+const lastName = s => {
+  s = s.replace(/\b(dr|prof|professor|mr|mrs|ms)\.?\s+/gi, '').replace(/,?\s+(ph\.?d\.?|md|jr\.?|sr\.?|ii|iii|iv)\s*$/i, '').trim();
+  return (s.includes(',') ? s.split(',')[0] : s.split(/\s+/).pop()).trim();
+};
+// Pull "MAE 102" out of names like "MAE102 FA25", "FA25 MAE-102 A00", "Thermo (MAE 102)".
+// Tries each source in order; returns the first source as-is if none has a code.
+// Term and section words that look like codes: "FA25", "Lec 01", "Sec 2".
+const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz)$/i;
+function courseCode(...srcs) {
+  srcs = srcs.map(x => (x || '').trim()).filter(Boolean);
+  for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,5})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
+    if (!SKIP.test(m[1])) return `${m[1]} ${m[2]}`;
+  return srcs[0] || '';
+}
 
 // Minimal STORE-only zip writer (PDFs don't compress anyway).
 const crcTable = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xEDB88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
