@@ -8,7 +8,7 @@ Brave/Chrome extension that zips up your Gradescope submissions. Export one assi
 
 ## Use
 1. Open any Gradescope page (a course or submission page gets pre-selected)
-3. Tick courses (or **Select all**), or expand one to pick individual assignments; choose original and/or graded copy. Click a course name, prof, term, or assignment name to change it (remembered; clear it to reset to Gradescope's)
+3. Tick courses (or **Select all**), or expand one to pick individual assignments; choose original and/or graded copy. Click a course name, prof, term, or assignment name to change it (remembered; clear it to reset to Gradescope's). Course names are boiled down to dept code + number automatically (`MAE102 FA25` → `MAE 102`) and profs to a last name. If it can't tell and a course name isn't just dept code + number (`mae 82`, `mae_82` or `mae-82`) or the prof isn't just a last name, it's shown as a text box with a ⚠ to the left of the row so you can fix it, or click Ignore
 4. **Export to ZIP** → `gradescope_export_<your name>_2026-11-05_16-42-07.zip`, with one folder per course inside named like `mae_174_mosleh_f16` (course, prof, term), files named like `mae_174_mosleh_f16_mt` (plus assignment) and `mae_174_mosleh_f16_mt_graded`
 4. **Export to ZIP** → one folder per course named like `mae_174_mosleh_f16` (course, prof, term), files named like `mae_174_mosleh_f16_mt` (plus assignment) and `mae_174_mosleh_f16_mt_graded`
 
