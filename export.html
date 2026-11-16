@@ -46,7 +46,8 @@
   .subs { grid-column:1 / -1; padding:2px 0 6px 26px; font-size:14px }
   .subs:empty { display:none }
   .subs label { padding:3px 0 }
-  .flag { color:#b8741a; font-size:13px; margin-right:-6px }
+  .course { position:relative }
+  .flag { position:absolute; left:-38px; top:50%; transform:translateY(-50%); color:#b8741a; font-size:16px; cursor:help }
   .bad { color:var(--ink) !important; background:var(--field); border:1px solid #d9a35b; border-radius:4px; padding:1px 8px; min-width:7em; display:inline-block }
   .bad:hover { border-color:var(--blue-dark) }
   @media (prefers-color-scheme: dark) { .flag { color:#e0a458 } .bad { border-color:#9a6a2c } }

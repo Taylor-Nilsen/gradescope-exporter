@@ -79,10 +79,8 @@ function render() {
     editable(row.querySelector('.term'), 'term', c.id, c.term, 'terms');
     const issues = ['name', 'prof'].filter(k => (k === 'name' || c.subs) && !edits.ok?.[`${k}:${c.id}`] && odd[k](val(k, c.id, c[k])));
     if (issues.length) {
-      for (const k of issues) {
-        const f = row.querySelector('.' + k); f.classList.add('bad'); f.title = hint[k];
-        f.before(Object.assign(document.createElement('span'), { className: 'flag', textContent: '⚠', title: hint[k] }));
-      }
+      for (const k of issues) { const f = row.querySelector('.' + k); f.classList.add('bad'); f.title = hint[k]; }
+      row.prepend(Object.assign(document.createElement('span'), { className: 'flag', textContent: '⚠', title: issues.map(k => hint[k]).join('\n') }));
       const w = Object.assign(document.createElement('button'), { className: 'ignore', textContent: 'Ignore' });
       w.onclick = e => {
         e.preventDefault();
