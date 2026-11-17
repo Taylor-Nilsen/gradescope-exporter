@@ -250,7 +250,7 @@ const lastName = s => {
 // Term and section words that look like codes: "FA25", "Lec 01", "Sec 2".
 const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz|spring|summer|winter|autumn|section|lecture|chapter|homework|midterm|final|module|session|period|group|room|year)$/i;
 function courseCode(...srcs) {
-  srcs = srcs.map(x => (x || '').trim()).filter(Boolean);
+  srcs = srcs.map(x => (x || '').replace(/mech\s*&\s*ae/gi, 'MAE').trim()).filter(Boolean);
   for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,10})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
     if (!SKIP.test(m[1])) return `${m[1]}_${m[2]}`.toLowerCase();
   return srcs[0] || '';
