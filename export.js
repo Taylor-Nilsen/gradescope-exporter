@@ -20,7 +20,7 @@ const save = (kind, key, orig, v) => {
   if (v && v !== orig) edits[kind][key] = v; else delete edits[kind][key];
   try { localStorage.edits = JSON.stringify(edits); localStorage.removeItem('termOverrides'); } catch {}
 };
-const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c.name), profOf = c => val('prof', c.id, c.prof), subOf = s => val('sub', s.path, s.name);
+const termOf = c => val('term', c.id, c.term), nameOf = c => val('name', c.id, c.name).toLowerCase(), profOf = c => val('prof', c.id, c.prof).toLowerCase(), subOf = s => val('sub', s.path, s.name);
 let editing = false;
 
 // courses: id -> { id, name, term, subs: null | [{name, path}], picked: Set(path), all: bool }
@@ -207,9 +207,9 @@ async function run() {
   log(`Done: ${files.length} file(s), ${(blob.size / 1e6).toFixed(1)} MB`);
 }
 
-// Course = dept code, one space/_/-, number ("mae 82", "mae_82", "cse-8a"); prof = one last name ("Mosleh").
-const odd = { name: v => !/^\p{L}{2,5}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
-const hint = { name: 'Course should be just dept code and number, like mae 82, mae_82 or mae-82. Click to change.', prof: 'Prof should be just a last name. Click to change.' };
+// Course = dept code, one space/_/-, number ("mae_82", "physics_1c", "cse-8a"); prof = one last name ("mosleh").
+const odd = { name: v => !/^\p{L}{2,10}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
+const hint = { name: 'Course should be just dept code and number, like mae_82 or physics_1c. Click to change.', prof: 'Prof should be just a last name. Click to change.' };
 
 // Name from the account settings form; '' if it can't be read.
 async function userName() {
@@ -240,19 +240,19 @@ const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, 
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
-// "Last, First" or "Dr. First Last PhD" -> Last
+// "Last, First" or "Dr. First Last PhD" -> last
 const lastName = s => {
   s = s.replace(/\b(dr|prof|professor|mr|mrs|ms)\.?\s+/gi, '').replace(/,?\s+(ph\.?d\.?|md|jr\.?|sr\.?|ii|iii|iv)\s*$/i, '').trim();
-  return (s.includes(',') ? s.split(',')[0] : s.split(/\s+/).pop()).trim();
+  return (s.includes(',') ? s.split(',')[0] : s.split(/\s+/).pop()).trim().toLowerCase();
 };
-// Pull "MAE 102" out of names like "MAE102 FA25", "FA25 MAE-102 A00", "Thermo (MAE 102)".
+// Pull "mae_102" out of names like "MAE102 FA25", "FA25 MAE-102 A00", "Thermo (MAE 102)".
 // Tries each source in order; returns the first source as-is if none has a code.
 // Term and section words that look like codes: "FA25", "Lec 01", "Sec 2".
-const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz)$/i;
+const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz|spring|summer|winter|autumn|section|lecture|chapter|homework|midterm|final|module|session|period|group|room|year)$/i;
 function courseCode(...srcs) {
   srcs = srcs.map(x => (x || '').trim()).filter(Boolean);
-  for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,5})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
-    if (!SKIP.test(m[1])) return `${m[1]} ${m[2]}`;
+  for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,10})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
+    if (!SKIP.test(m[1])) return `${m[1]}_${m[2]}`.toLowerCase();
   return srcs[0] || '';
 }
 
