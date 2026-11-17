@@ -236,7 +236,7 @@ async function gradedPdf(paths) {
 }
 
 // "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mosleh_f16_mt (no assignment -> mae_174_mosleh_f16)
-const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const slug = s => s.toLowerCase().replace(/[^a-z0-9&]+/g, '_').replace(/_?&_?/g, '-').replace(/^_|_$/g, '');
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
