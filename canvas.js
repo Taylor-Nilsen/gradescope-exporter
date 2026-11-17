@@ -37,7 +37,7 @@ async function cvConnect(origin) {
   cvCourses.clear();
   for (const x of await call('/api/v1/courses?include[]=term&include[]=teachers&state[]=available&state[]=completed')) {
     if (!x.name) continue; // date-restricted courses come back without details
-    cvCourses.set('cv' + x.id, { id: 'cv' + x.id, cid: x.id, cv: true, name: x.course_code || x.name, term: x.term?.name || '',
+    cvCourses.set('cv' + x.id, { id: 'cv' + x.id, cid: x.id, cv: true, name: courseCode(x.course_code, x.name) || x.name, term: x.term?.name || '',
       prof: lastName(x.teachers?.[0]?.display_name || ''), subs: null, picked: new Set(), all: false });
   }
   return me.name || '';
