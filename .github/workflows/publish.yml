@@ -3,7 +3,7 @@ name: Publish to Chrome Web Store
 on:
   push:
     branches: [main]
-    paths-ignore: ['README.md', '.github/**']
+    paths-ignore: ['README.md', '.github/**', 'store/**']
   workflow_dispatch:
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
         run: |
           v="$(jq -r .version manifest.json).${{ github.run_number }}"
           jq --arg v "$v" '.version = $v' manifest.json > m.json && mv m.json manifest.json
-          zip -r ext.zip manifest.json background.js export.html export.js icons
+          zip -r ext.zip manifest.json background.js export.html export.js canvas.js icons
           echo "Version $v"
 
       # Mint the token straight from the SA key; avoids needing the IAM Credentials API.

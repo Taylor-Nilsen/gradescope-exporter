@@ -1,17 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Gradescope Exporter",
-  "version": "1.0",
-  "description": "Zip up your Gradescope submissions (original and/or graded copy) for one assignment or a whole course.",
+  "name": "Class Exporter",
+  "version": "1.2",
+  "description": "Zip up your Gradescope submissions and everything in your Canvas courses: assignments, quizzes, pages, files, and more.",
   "permissions": [
     "activeTab"
   ],
   "host_permissions": [
     "https://www.gradescope.com/*",
-    "https://*.amazonaws.com/*"
+    "https://*.amazonaws.com/*",
+    "https://*.instructure.com/*",
+    "https://*.inscloudgate.net/*",
+    "https://*.instructure-uploads.com/*",
+    "https://*.canvas-user-content.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
   ],
   "action": {
-    "default_title": "Export Gradescope submissions",
+    "default_title": "Export Gradescope and Canvas",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
