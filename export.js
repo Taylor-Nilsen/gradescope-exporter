@@ -225,7 +225,7 @@ async function run() {
 }
 
 // Course = dept code, one space/_/-, number ("mae_82", "physics_1c", "cse-8a"); prof = one last name ("mosleh").
-const odd = { name: v => !/^[\p{L}&]{2,10}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
+const odd = { name: v => !/^[\p{L}-]{2,10}[ _-]\d{1,3}\p{L}{0,2}$/u.test(v), prof: v => !/^\p{L}[\p{L}'-]*$/u.test(v) };
 const hint = { name: 'Course should be just dept code and number, like mae_82 or physics_1c. Click to change.', prof: 'Prof should be just a last name. Click to change.' };
 
 // Name from the account settings form; '' if it can't be read.
@@ -253,7 +253,7 @@ async function gradedPdf(paths) {
 }
 
 // "MAE 174", "Midterm", "Fall 2016", "Mosleh" -> mae_174_mosleh_f16_mt (no assignment -> mae_174_mosleh_f16)
-const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const slug = s => s.toLowerCase().replace(/[^a-z0-9&]+/g, '_').replace(/_?&_?/g, '-').replace(/^_|_$/g, '');
 const abbr = s => slug(s).replace(/^midterm/, 'mt').replace(/^homework/, 'hw');
 const termCode = t => { const m = t.match(/(fall|winter|spring|summer)\s*(\d{4})/i); return m ? ({ fall: 'f', winter: 'w', spring: 's', summer: 'su' })[m[1].toLowerCase()] + m[2].slice(2) : slug(t); };
 const fileBase = (c, assignment) => [slug(nameOf(c)), slug(profOf(c)), termCode(termOf(c)), abbr(assignment || '')].filter(Boolean).join('_');
@@ -268,8 +268,8 @@ const lastName = s => {
 const SKIP = /^(fa|fl|wi|sp|su|ss|fall|sum|spr|win|lec|sec|dis|lab|sect|disc|week|hw|ch|unit|part|exam|quiz|spring|summer|winter|autumn|section|lecture|chapter|homework|midterm|final|module|session|period|group|room|year)$/i;
 function courseCode(...srcs) {
   srcs = srcs.map(x => (x || '').trim()).filter(Boolean);
-  // Registrar pattern term-dept-course-type-section: "26F-MECH&AE-82-LEC-1" -> mech&ae_82
-  for (const src of srcs) { const m = src.match(/^\d{2}\p{L}{1,2}-([^-]+)-([^-]+)-\p{L}+-[^-]+$/u); if (m) return `${m[1]}_${m[2]}`.toLowerCase(); }
+  // Registrar pattern term-dept-course-type-section: "26F-MECH&AE-82-LEC-1" -> mech-ae_82
+  for (const src of srcs) { const m = src.match(/^\d{2}\p{L}{1,2}-([^-]+)-([^-]+)-\p{L}+-[^-]+$/u); if (m) return `${m[1].replace(/[^\p{L}\d]+/gu, '-')}_${m[2]}`.toLowerCase(); }
   for (const src of srcs) for (const m of src.matchAll(/(?<![\p{L}\d])(\p{L}{2,10})\s*[ _-]?\s*(\d{1,3}\p{L}{0,2})(?![\p{L}\d])/gu))
     if (!SKIP.test(m[1])) return `${m[1]}_${m[2]}`.toLowerCase();
   return srcs[0] || '';
