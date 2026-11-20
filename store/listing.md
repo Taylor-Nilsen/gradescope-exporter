@@ -34,4 +34,4 @@ Not affiliated with Gradescope, Turnitin, Canvas, or Instructure.
 - screenshot-1-gradescope.png, screenshot-2-canvas.png, screenshot-3-export.png, screenshot-4-dark.png (1280x800)
 - promo-small-440x280.png (small promo tile)
 - promo-marquee-1400x560.png (marquee promo tile)
-- Regenerate: `node store/mock.js <gs|cv|done> <light|dark> <out.png>` for raw UI shots, then `node store/compose.js`
+- Regenerate: from store/: `node mock.js gs light ui_gs.png`, same for `cv light ui_cv.png`, `done light ui_done.png`, `cv dark ui_cvdark.png`, then `node compose.js`
