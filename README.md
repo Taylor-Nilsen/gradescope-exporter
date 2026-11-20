@@ -1,4 +1,4 @@
-# Gradescope Exporter
+# Class Exporter
 
 Brave/Chrome extension that zips up your Gradescope submissions (originals and/or graded copies) and everything in your Canvas courses.
 

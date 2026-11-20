@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Gradescope & Canvas Exporter",
-  "version": "1.1",
-  "description": "Zip up your Gradescope submissions and everything in your Canvas courses.",
+  "name": "Class Exporter",
+  "version": "1.2",
+  "description": "Zip up your Gradescope submissions and everything in your Canvas courses: assignments, quizzes, pages, files, and more.",
   "permissions": [
     "activeTab"
   ],
@@ -18,7 +18,7 @@
     "https://*/*"
   ],
   "action": {
-    "default_title": "Export Gradescope submissions",
+    "default_title": "Export Gradescope and Canvas",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
